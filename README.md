@@ -1,5 +1,4 @@
-# php-reporting-for-unicentaopos
-A reporting tool for Unicenta POS
+# A reporting tool for Unicenta POS
 
 I have setup and maintain the POS of a client. The reports do not show discounts on transactions.
 
