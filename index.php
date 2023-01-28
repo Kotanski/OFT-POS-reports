@@ -84,11 +84,11 @@
   	         'Stock in Minus'=>'stock-minus'];
 
   	// database settings
-    $user = 'user';
-	$pwd  = 'password';
+    	$user = '';
+	$pwd  = 'user';
 	$db   = 'unicentaopos';
 	$host = 'localhost';
-	$currency = 'USD';
+	$currency = 'N$';
 	$max = 20; // records to return for default
 	
 	// connect to MySQL server before doing anything more
@@ -108,7 +108,7 @@
 	$date_start = @ $_GET['date_start'];
 	$date_end   = @ $_GET['date_end'];
 	$time_start = urldecode(@ $_GET['time_start']);
-    $time_end   = urldecode(@ $_GET['time_end']);
+    	$time_end   = urldecode(@ $_GET['time_end']);
 	$time_start = strlen($time_start) ? $time_start : '00:00:00';
 	$time_end   = strlen($time_end) ? $time_end : '23:50:00';
 	$personid   = @ $_GET['person'];
@@ -217,7 +217,7 @@
 							WHERE
 								t.ticketid = '$receiptid'
 							ORDER BY 
-								r.datenew DESC;";	
+								r.datenew DESC LIMIT 1;";	
 												
 			} elseif ($date_start && $date_end){
 					$hidedetails = false;
@@ -253,7 +253,8 @@
   	    	
 		case 'discounts':  		
 
-			$ig = ['units', 'money', 'receipt', 'tip', 'transid', 'isprocessed',	'returnmsg', 'personid',	'notes',	'tendered',	'cardname',	'voucher','ticketidx', 'tickettype', 'customer', 'status'];
+			$ig = ['units', 'money', 'receipt', 'tip', 'transid', 'isprocessed',
+			 	   'returnmsg', 'personid',	'notes',	'tendered',	'cardname',	'voucher','ticketidx', 'tickettype', 'customer', 'status'];
 			foreach($ig as $col) {
 				array_push($ignored, $col);
 			}
@@ -287,7 +288,7 @@
 							WHERE
 								t.ticketid = $receiptid
 							ORDER BY 
-								r.datenew DESC;";				
+								r.datenew DESC LIMIT 1;";				
 								
 			} else if ($date_start && $date_end){
 					$sql = "SELECT 
@@ -307,7 +308,7 @@
 			} else {
 					    $hidedetails = true;	
 				$sql = "SELECT 
-								ticketid,datenew AS `Date`, pp.id as personid, pp.name AS person,payment, total,   receipt
+								distinct ticketid,datenew AS `Date`, pp.id as personid, pp.name AS person,payment, total,   receipt
 							FROM
 								receipts r
 									INNER JOIN payments p ON r.id = p.receipt
@@ -422,9 +423,10 @@
 			} else {
 				while ($row0 = $ret0->fetch_array()){
 						$item=$row0['product'];
+						$attrs=$row0['attributes'];
 						$units = 1;
-						
-						if ($item == '_line_discount_'){
+
+						if ($item == '_line_discount_' || strpos($attrs,'%') !== false){
 							/*
 							<?xml version="1.0" encoding="UTF-8"?>
 							<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">
