@@ -104,7 +104,6 @@
 	$hidedetails = false; 
 	
 	$view = @ $_GET['view'];
-	if (!strlen(trim($view))) $view = $default_view;
 	
 	$date_start = @ $_GET['date_start'];
 	$date_end   = @ $_GET['date_end'];
