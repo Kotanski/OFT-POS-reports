@@ -1,12 +1,18 @@
 <!Doctype html>
 <html moznomarginboxes mozdisallowselectionprint>
  <head>
-  <title>Unicenta POS Reports</title>
+ <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Unicenta PHP Reports</title>
 	<!-- Latest compiled and minified CSS -->
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
 
 	<!-- Optional theme -->
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
+	<link rel="icon" href="unicentaopos-100x100.png" sizes="32x32" />
+	<link rel="icon" href="unicentaopos-300x300.png" sizes="192x192" />
+	<link rel="apple-touch-icon" href="unicentaopos-300x300.png" />
+	<meta name="msapplication-TileImage" content="unicentaopos-300x300.png" />
   
   <style>
 	@media print {
@@ -25,14 +31,12 @@
 	  padding: 0;
 	  width: 100%;
 	  height:100%; 
-	}
-	.container {
-		background-color: #fff;
+	  background:hsl(0,0%,100%);
 	}
 	.bg-grey {background: grey;}
     .header {font-size: 14pt; color: #FFF; background: #2a5d84; padding: 15px;}
 	.header a {color: #FFF;}	
-	.header a.active {color: yellow; font-weight: bold;}
+	.header a.active {color: yellow;}
 	p.alert { padding: 5px; }
 	.search {padding:10px; background: wheat;}
 	#term {padding: 5px;width: 300px;}	
@@ -41,7 +45,7 @@
 	.align-right {text-align: right; }
 	.discount-highlight {color: green;}
 	table.sales thead tr th:nth-child(6){ text-align:right;}
-	table.sales tbody tr td:nth-child(6){ text-align:right; text-decoration: underline;}
+	table.sales tbody tr td:nth-child(6){ text-align:right;}
 	table.details thead tr th:nth-child(2){ text-align:right;}
 	table.details tbody tr td:nth-child(2){ text-align:right;}
 	table.details thead tr th:nth-child(3){ text-align:center;}
@@ -63,8 +67,13 @@
      * I created this because a client could not find line discounts on any of the reports
      * You can use this to create your own flexible custom reports
      *
-     * How discounts are stored in the database in a BLOB
-     
+     * How discounts are stored
+     *
+     * When transaction discount
+     * attributes column in ticketlines table contains product name + Item Discount @ ?%
+     *
+     * When line discount:
+	 * attributes column in ticketlines table contains BLOB XML:
 	 *
 		<?xml version="1.0" encoding="UTF-8"?>
 		<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">
@@ -78,18 +87,21 @@
     */
   
     // menu (title->view)
-  	$urls = ['All Sales'=>'sales', 
+  	$urls = ['Sales'=>'sales', 
   	         'Discounts'=>'discounts', 
+  	         'Category Detail'=>'category-detail',	           	         
   	         'Stock Update'=>'stock-update', 
-  	         'Stock in Minus'=>'stock-minus'];
+  	         'Stock in Minus'=>'stock-minus'
+  	        ];
 
   	// database settings
-    	$user = '';
-	$pwd  = 'user';
+    $user = '';
+	$pwd  = '!';
 	$db   = 'unicentaopos';
 	$host = 'localhost';
-	$currency = 'N$';
+	$currency = 'USD';
 	$max = 20; // records to return for default
+	$showsql = false;
 	
 	// connect to MySQL server before doing anything more
 	$conn = new mysqli($host, $user,$pwd, $db ) or die($mysqli->error);
@@ -108,7 +120,7 @@
 	$date_start = @ $_GET['date_start'];
 	$date_end   = @ $_GET['date_end'];
 	$time_start = urldecode(@ $_GET['time_start']);
-    	$time_end   = urldecode(@ $_GET['time_end']);
+    $time_end   = urldecode(@ $_GET['time_end']);
 	$time_start = strlen($time_start) ? $time_start : '00:00:00';
 	$time_end   = strlen($time_end) ? $time_end : '23:50:00';
 	$personid   = @ $_GET['person'];
@@ -121,15 +133,15 @@
   		array_push($tmp, "<a href='?view=$link' class='$class'>$title</a>");
   	}
   	$tmp = implode(' &middot; ', $tmp);
- 
-  	echo "<div class='header'>$tmp</div>";
+
+  	echo "<div class='header noprint'>$tmp</div>";
 	echo "<div class='search noprint'>
 	
 	        <!-- form to filter report by ticket/receipt id -->
 			<form class='noprint'>
 			 <input type='hidden' name='view' value=\"$view\">
 			 <b>Ticketid</b> <input type='number' name='receiptid' required value=\"$receiptid\">   	    	 
-	   	     <input type='submit' value='Report for Ticketid' class='btn btn-sm btn-primary'>
+	   	     <input type='submit' value='Run Report' class='btn btn-sm btn-primary'>
 			</form>
 						
 	        <!-- form to filter report by date -->						
@@ -139,8 +151,9 @@
 			 <input type='time' name='time_start' required value=\"$time_start\"> &middot;
 			 <b>End Date</b> <input type='date' name='date_end' required value=\"$date_end\">
    	    	 <input type='time' name='time_end' required value=\"$time_end\">
-	   	     <input type='submit' value='Report for Dates' class='btn btn-sm btn-primary'>
-			</form>
+	   	     <input type='submit' value='Run Report' class='btn btn-sm btn-primary'>
+	   	     <a href='#' class='btn btn-sm btn-success' onclick='window.print(); return false;'>Print</a>
+			</form>			 
 		 </div>
 		 <p>&nbsp;</p>";
 		 
@@ -178,22 +191,50 @@
 				  </script>";
 			}
 
-  	 $sql = '';
+	// default sql
+	$filter = [];
+	$order  = "r.datenew DESC LIMIT $max";
+	$sql = "SELECT 
+					DISTINCT t.ticketid,
+					datenew AS `date`, 
+					pp.id as personid, 
+					pp.name AS person,
+					payment AS type, 
+					total, 
+					receipt,
+					tendered
+				FROM
+					receipts r
+						INNER JOIN payments p ON r.id = p.receipt
+					INNER JOIN tickets t ON t.id = r.id
+					INNER JOIN ticketlines tl ON tl.ticket = t.id
+					INNER JOIN people pp ON pp.id = t.person
+				
+				ORDER BY 
+					r.datenew DESC LIMIT $max;";
 	 
   	switch ($view){
   	    case 'sales':
+  	    case 'discounts':
 	  	    // add to list ofignored columns
 			$ig = ['units', 'money', 'receipt', 'tip', 'transid', 'isprocessed',
-			       'returnmsg', 'personid',	'notes','tendered',	'cardname',	
+			       'returnmsg', 'personid',	'notes','tenderedx',	'cardname',	
 			       'voucher','ticketidx', 'tickettype', 'customer', 'status'];			       
 			foreach($ig as $col) {
 				array_push($ignored, $col);
 			}  	    
 								
 			if ($personid){
+				$extras = ($view == 'discounts') ? "AND tl.attributes LIKE '%Discount%'" : '';
 				$sql = "SELECT 
 								DISTINCT t.ticketid,
-								datenew AS `Date`, pp.id as personid, pp.name AS person, payment, total, receipt
+								datenew AS `date`, 
+								pp.id as personid, 
+								pp.name AS person, 
+								payment AS type, 
+								total, 
+								receipt,
+								tendered
 							FROM
 								receipts r
 									INNER JOIN payments p ON r.id = p.receipt
@@ -201,13 +242,19 @@
 								INNER JOIN ticketlines tl ON tl.ticket = t.id
 								INNER JOIN people pp ON pp.id = t.person
 							WHERE
-								pp.id = '$personid'				
+								pp.id = '$personid' $extras				
 							ORDER BY 
 								r.datenew DESC;";	
 			} elseif ($receiptid){
 				$sql = "SELECT 
 								DISTINCT t.ticketid,
-								datenew AS `Date`, pp.id as personid, pp.name AS person,payment, total,  receipt
+								datenew AS `date`, 
+								pp.id as personid, 
+								pp.name AS person,
+								payment AS type, 
+								total,  
+								receipt,
+								tendered
 							FROM
 								receipts r
 									INNER JOIN payments p ON r.id = p.receipt
@@ -217,12 +264,20 @@
 							WHERE
 								t.ticketid = '$receiptid'
 							ORDER BY 
-								r.datenew DESC LIMIT 1;";	
+								r.datenew DESC;";	
 												
 			} elseif ($date_start && $date_end){
 					$hidedetails = false;
+					$extras = ($view == 'discounts') ? "AND tl.attributes LIKE '%Discount%'" : '';
 					$sql = "SELECT 
-									DISTINCT ticketid,datenew AS `Date`, pp.id as personid, pp.name AS person,payment, total,   receipt
+									DISTINCT ticketid,
+									datenew AS `date`, 
+									pp.id as personid, 
+									pp.name AS person,
+									payment AS type, 
+									total,   
+									receipt,
+									tendered
 								FROM
 									receipts r
 										INNER JOIN payments p ON r.id = p.receipt
@@ -231,97 +286,33 @@
 									INNER JOIN people pp ON pp.id = t.person
 								WHERE
 									(r.datenew BETWEEN '$date_start $time_start' AND '$date_end $time_end') 
+									$extras
 								ORDER BY 
 									r.datenew ASC;";	
 																					
 			} else {
 				$hidedetails = true;
+				$extras = $view == 'discounts' ? "WHERE	tl.attributes LIKE '%Discount%'" : '';
 				$sql = "SELECT 
 								DISTINCT t.ticketid,
-								datenew AS `Date`, pp.id as personid, pp.name AS person,payment,  total, receipt
+								datenew AS `date`, 
+								pp.id as personid, 
+								pp.name AS person,
+								payment AS type, 
+								total, 
+								tendered,
+								receipt
 							FROM
 								receipts r
 									INNER JOIN payments p ON r.id = p.receipt
 								INNER JOIN tickets t ON t.id = r.id
 								INNER JOIN ticketlines tl ON tl.ticket = t.id
 								INNER JOIN people pp ON pp.id = t.person
-							
+							$extras
 							ORDER BY 
 								r.datenew DESC LIMIT $max;";
 			}
   	    	break;
-  	    	
-		case 'discounts':  		
-
-			$ig = ['units', 'money', 'receipt', 'tip', 'transid', 'isprocessed',
-			 	   'returnmsg', 'personid',	'notes',	'tendered',	'cardname',	'voucher','ticketidx', 'tickettype', 'customer', 'status'];
-			foreach($ig as $col) {
-				array_push($ignored, $col);
-			}
-
-			if ($personid){
-				$sql = "SELECT 
-								DISTINCT t.ticketid,
-								datenew AS `Date`, pp.id as personid, pp.name AS person,payment, total,  receipt
-							FROM
-								receipts r
-									INNER JOIN payments p ON r.id = p.receipt
-								INNER JOIN tickets t ON t.id = r.id
-								INNER JOIN ticketlines tl ON tl.ticket = t.id
-								INNER JOIN people pp ON pp.id = t.person
-							WHERE
-								pp.id = '$personid' AND
-									tl.attributes LIKE '%Discount%'								
-							ORDER BY 
-								r.datenew DESC;";		
-										
-			} elseif ($receiptid){				
-				$sql = "SELECT 
-								DISTINCT t.ticketid,
-								datenew AS `Date`, pp.id as personid, pp.name AS person,payment,  total, receipt
-							FROM
-								receipts r
-									INNER JOIN payments p ON r.id = p.receipt
-								INNER JOIN tickets t ON t.id = r.id
-								INNER JOIN ticketlines tl ON tl.ticket = t.id
-								INNER JOIN people pp ON pp.id = t.person
-							WHERE
-								t.ticketid = $receiptid
-							ORDER BY 
-								r.datenew DESC LIMIT 1;";				
-								
-			} else if ($date_start && $date_end){
-					$sql = "SELECT 
-									DISTINCT ticketid, datenew AS `Date`, pp.id as personid, pp.name AS person,payment,  total,  receipt
-								FROM
-									receipts r
-										INNER JOIN payments p ON r.id = p.receipt
-									INNER JOIN tickets t ON t.id = r.id
-									INNER JOIN ticketlines tl ON tl.ticket = t.id
-									INNER JOIN people pp ON pp.id = t.person
-								WHERE
-									(r.datenew BETWEEN '$date_start $time_start' AND '$date_end $time_end') AND
-									tl.attributes LIKE '%Discount%'								
-								ORDER BY 
-									r.datenew ASC;";	
-																	
-			} else {
-					    $hidedetails = true;	
-				$sql = "SELECT 
-								distinct ticketid,datenew AS `Date`, pp.id as personid, pp.name AS person,payment, total,   receipt
-							FROM
-								receipts r
-									INNER JOIN payments p ON r.id = p.receipt
-								INNER JOIN tickets t ON t.id = r.id
-								INNER JOIN ticketlines tl ON tl.ticket = t.id
-								INNER JOIN people pp ON pp.id = t.person
-							WHERE
-								tl.attributes LIKE '%Discount%'
-							ORDER BY 
-								r.datenew DESC LIMIT $max;";		
-			}
-						
-			break;
 			
   		case 'stock-minus':
   			 $hidedetails = true;
@@ -354,7 +345,10 @@
 			 		 FROM products p
 			 		 	INNER JOIN categories c ON c.id = p.category
 			 		 	INNER JOIN stockcurrent sc ON sc.product = p.id 
-			 		 ORDER BY c.name ASC;";				                            	
+			 		 ORDER BY c.name ASC;";	
+			 break;
+
+  	    				 			                            	
   	}
 	 
 	 // did we get a submit?
@@ -375,6 +369,10 @@
 	 elseif ($date_start && $date_end) echo alert("Showing $view between <b>$date_start $time_start</b> and <b>$date_end $time_end</b> &middot; <a href='?view=$view'>Show All</a>", 'info');
 	 else if (!in_array($view, ['stock-update', 'stock-minus']))	echo alert("Showing last $max <b>$view</b> transactions.", 'info');
 
+     if ($showsql){
+     	echo "<p class='alert alert-info noprint'>$sql</p>";
+     }
+	     
 	 $ret = $conn->query($sql) or die('xx'.$mysqli->error);
 	 if (!$ret || !$ret->num_rows){
 		 echo alert("Your parameters did not return any data. Double-check start and end date/time.", 'warning');
@@ -413,28 +411,39 @@
 			
 			$receipt = @$row['receipt'];
 			$sql0 = "SELECT line, 
-							(CASE WHEN product IS NULL THEN '_line_discount_' ELSE (SELECT p.name FROM products p WHERE p.id=tl.product) END) AS product, 
-							price,tl.units, tl.attributes
+							(CASE WHEN product IS NULL THEN '_line_discount_' 
+							ELSE (SELECT p.name FROM products p WHERE p.id=tl.product) END) AS product, 	
+							(CASE WHEN product IS NULL THEN '' 
+							ELSE (SELECT c.name FROM products p INNER JOIN categories c WHERE p.id=tl.product AND p.category=c.id) END) AS category,												
+							price,
+							tl.units, 
+							tl.attributes
 					 FROM 
 					 	ticketlines tl 
 					 WHERE tl.ticket='$receipt';";
+					 
 			$ret0 = $conn->query($sql0) or die($mysqli->error);
 			if (!$ret0 || !$ret0->num_rows){
 			} else {
 				while ($row0 = $ret0->fetch_array()){
 						$item=$row0['product'];
 						$attrs=$row0['attributes'];
+						$category = $row0['category'];
+						$categoryf=$category ? "<span class='badge'>$category</span>" : '';
 						$units = 1;
 
+						// Line Discount 5%
+						// Item Discount 5%
 						if ($item == '_line_discount_' || strpos($attrs,'%') !== false){
+							//if ($showsql) echo "<p class='alert alert-warning'>$sql0</p>";
 							/*
 							<?xml version="1.0" encoding="UTF-8"?>
 							<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">
 							<properties>
 								<comment>uniCenta oPOS</comment>
-								<entry key="product.taxcategoryid">001</entry>
-								<entry key="product.printer">1</entry>
-								<entry key="product.name">Line Discount 20%</entry>
+								<entry key="product.taxcategoryid">001</entry>      -->[0]
+								<entry key="product.printer">1</entry>              -->[1] 
+								<entry key="product.name">Line Discount 20%</entry> -->[2]
 							</properties>
 							*/
 							$attributes = $row0['attributes'];
@@ -462,7 +471,7 @@
 						$value = $priceandtax * $units;
 						$value = number_format($value,2);
 						$details.= "<tr>
-							          <td>$item</td>
+							          <td>$item $categoryf</td>
 							          <td>$currency $pricef</td>
 							          <td>x$units</td>
 							          <td>$currency $value</td>
@@ -492,7 +501,19 @@
 				$val = $row[$col];
 
 				switch ($col){
-
+					case 'date':
+						$val = date_create($val);
+						$val = date_format($val,"d-M-Y H:i:s");
+						$data .= "<td>$val</td>";	
+						break;
+						
+					case 'payment':
+					case 'type':
+						if ($val == 'ccard') $val = 'card';
+						$val = ucwords($val);
+						$data .= "<td>$val</td>";	
+						break;
+												
 					case 'units':
 
 						$id = $row['id'];
@@ -522,6 +543,9 @@
 						break;
 						
 					case 'ticketid':
+						// when in this view, send click on ticketid to sales
+						$view = in_array($view,['transactions-extended']) ? 'sales':$view;
+												
 						$val = "<a href='?view=$view&receiptid=$val'>$val</td>";
 						$data .= "<td>$val</td>";
 						break;
@@ -531,7 +555,13 @@
 						$val = "<a href='?view=$view&person=$pid'>$val</td>";
 						$data .= "<td>$val</td>";
 						break;
-																		
+								
+					case 'tendered':
+						$val = number_format($val, 2);
+						$data .= "<td class='bold'>$currency $val</td>";					
+						break;	
+														
+					case 'value':										
 					case 'total':
 						$grandtotal += $val;
 						$val = number_format($val, 2);
@@ -547,10 +577,10 @@
 					  $details";
 			$idx++;
 		}
-	     
+	     	     
 	     if ($date_start && $date_end){
 	     	$grandtotalf = number_format($grandtotal, 2);
-	     	echo "<h2 class='bold align-right underline'>Grand Total: $currency $grandtotalf</h2>";
+	     	echo "<h2 class='bold align-right underline'>Total: $currency $grandtotalf</h2>";
 	     }
 	     
 		 echo "<div class='table-responsive'>
@@ -568,7 +598,9 @@
 	 }
 	 
 	 function alert($msg, $color='info'){
-		 return "<p class='alert alert-$color noprint'>$msg</p>";
+ 		 $date = new DateTime('now');
+		 $date = $date->format('d-M-Y H:i:s');	 
+		 return "<p class='alert alert-$color noprintx'><b>$date</b> &middot; $msg</p>";
 	 }
    ?>
     </div> <!-- col-md-12 -->
