@@ -85,38 +85,34 @@
 		</properties>
 	*   
     */
-  
+	// how we show transactions with discounts applied
+	// SELECT distinct(ticket) FROM ticketlines WHERE attributes LIKE '%Discount%';
+	
+  	// database settings
+    $user = '';
+	$pwd  = '';
+	$db   = 'unicentaopos';
+	$host = 'localhost';
+	$currency = 'N$';
+	$max = 20; // records to return for default
+	$showsql = false;
+	$hidedetails = false; // by default don't show the products in a transaction   	         
+	// we list the table columns dynamically, we can filter out the ones we don't need to show
+	$ignored = ['id', 'code', 'codetype'];
+	
     // menu (title->view)
-  	$urls = ['Sales'=>'sales', 
-  	         'Discounts'=>'discounts', 
+  	$urls = ['Sales'=>'sales', 						// show all sales (minus details)
+			 'Sales Extended'=>'sales-extended', 	// show sales with details
+  	         'Discounts'=>'discounts', 				// show all discounts + details when dates set
   	         'Category Detail'=>'category-detail',	           	         
   	         'Stock Update'=>'stock-update', 
   	         'Stock in Minus'=>'stock-minus'
   	        ];
-
-  	// database settings
-    $user = '';
-	$pwd  = '!';
-	$db   = 'unicentaopos';
-	$host = 'localhost';
-	$currency = 'USD';
-	$max = 20; // records to return for default
-	$showsql = false;
-	
+  	        				
 	// connect to MySQL server before doing anything more
-	$conn = new mysqli($host, $user,$pwd, $db ) or die($mysqli->error);
-	 
-	// how we show transactions with discounts applied
-	// SELECT distinct(ticket) FROM ticketlines WHERE attributes LIKE '%Discount%';
-		 
-	// we list the table columns dynamically, we can filter out the ones we don't need to show
-	$ignored = ['id', 'code', 'codetype'];
-	
-	// by default don't show the products in a transaction   	         
-	$hidedetails = false; 
-	
-	$view = @ $_GET['view'];
-	
+	$conn = @ new mysqli($host, $user,$pwd, $db ) or die($mysqli->error);
+
+	$view = @ $_GET['view'];	
 	$date_start = @ $_GET['date_start'];
 	$date_end   = @ $_GET['date_end'];
 	$time_start = urldecode(@ $_GET['time_start']);
@@ -135,10 +131,10 @@
   	$tmp = implode(' &middot; ', $tmp);
 
   	echo "<div class='header noprint'>$tmp</div>";
-	echo "<div class='search noprint'>
-	
+  	
+	echo "<div class='search noprint'>	
 	        <!-- form to filter report by ticket/receipt id -->
-			<form class='noprint'>
+			<form>
 			 <input type='hidden' name='view' value=\"$view\">
 			 <b>Ticketid</b> <input type='number' name='receiptid' required value=\"$receiptid\">   	    	 
 	   	     <input type='submit' value='Run Report' class='btn btn-sm btn-primary'>
@@ -192,8 +188,6 @@
 			}
 
 	// default sql
-	$filter = [];
-	$order  = "r.datenew DESC LIMIT $max";
 	$sql = "SELECT 
 					DISTINCT t.ticketid,
 					datenew AS `date`, 
@@ -215,12 +209,13 @@
 	 
   	switch ($view){
   	    case 'sales':
+  	    case 'sales-extended':
   	    case 'discounts':
 	  	    // add to list ofignored columns
-			$ig = ['units', 'money', 'receipt', 'tip', 'transid', 'isprocessed',
+			$ign = ['units', 'money', 'receipt', 'tip', 'transid', 'isprocessed',
 			       'returnmsg', 'personid',	'notes','tenderedx',	'cardname',	
 			       'voucher','ticketidx', 'tickettype', 'customer', 'status'];			       
-			foreach($ig as $col) {
+			foreach($ign as $col) {
 				array_push($ignored, $col);
 			}  	    
 								
@@ -267,7 +262,7 @@
 								r.datenew DESC;";	
 												
 			} elseif ($date_start && $date_end){
-					$hidedetails = false;
+					$hidedetails = $view == 'sales' ? true : false;
 					$extras = ($view == 'discounts') ? "AND tl.attributes LIKE '%Discount%'" : '';
 					$sql = "SELECT 
 									DISTINCT ticketid,
@@ -316,7 +311,6 @@
 			
   		case 'stock-minus':
   			 $hidedetails = true;
-  			 //$ignored = [];
 			 $sql = "SELECT 
 			 				p.id, 
 			 				c.name AS category, 
@@ -351,16 +345,16 @@
   	    				 			                            	
   	}
 	 
-	 // did we get a submit?
+	 // did we get a submit for stock update?
 	 $extra = (int) @ $_POST['extra'];
 	
 	 if ($extra){
-		 $id = $_POST['id'];
+		 $id      = $_POST['id'];
 		 $product = $_POST['product'];
-		 $units = (int) $_POST['units'];
-		 echo alert("<b>$product</b> has been updated to $units units. It may no longer show in this view.", 'success');
+		 $units   = (int) $_POST['units'];		 
 		 $sql0 = "UPDATE `stockcurrent` SET units=$units WHERE product='$id';";
 		 $conn->query($sql0) or die(alert($conn->error, 'red'));
+		 echo alert("<b>$product</b> has been updated to $units units. It may no longer show in this view.", 'success');
 	 }
 
 	 //echo alert($sql, 'success');
@@ -373,9 +367,10 @@
      	echo "<p class='alert alert-info noprint'>$sql</p>";
      }
 	     
-	 $ret = $conn->query($sql) or die('xx'.$mysqli->error);
+	 $ret = $conn->query($sql) or die( alert('fatal error: '.$mysqli->error, 'danger'));
 	 if (!$ret || !$ret->num_rows){
 		 echo alert("Your parameters did not return any data. Double-check start and end date/time.", 'warning');
+		 
 	 } else {
 	     
 		$idx = 1;
@@ -394,13 +389,10 @@
 			}
 		}
 
+		// account for cols: #, ticketid
 	    $max_cols = sizeof($cols) ? sizeof($cols)-2 : 0;
 	    	     
-		if (sizeof($cols)){
-			$cols = implode("", $cols);
-		} else {
-			$cols = "";
-		}     
+		$cols = (sizeof($cols)) ? implode('', $cols) : '';
 
 		$grandtotal = 0;
 		
@@ -432,8 +424,7 @@
 						$categoryf=$category ? "<span class='badge'>$category</span>" : '';
 						$units = 1;
 
-						// Line Discount 5%
-						// Item Discount 5%
+						// if 'Line Discount ?%' or 'Item Discount @ ?%' in attributes
 						if ($item == '_line_discount_' || strpos($attrs,'%') !== false){
 							//if ($showsql) echo "<p class='alert alert-warning'>$sql0</p>";
 							/*
@@ -454,7 +445,7 @@
 
 								$item  = $xml->entry[2];
 								$units = (int) $xml->entry[1];
-								// Filter the Numbers from String
+								// Find the percentage from Line Discount 5% 
 								$perc = (int)filter_var($item, FILTER_SANITIZE_NUMBER_INT);
 								$item = "<span class='discount-highlight bold'>$item</span>";
 								$price = $perc/100;
@@ -478,7 +469,6 @@
 							        </tr>";
 				}
 			}
-
 			
 			$table = "<table class='table table-compressed table-hover table-bordered table-striped details'>
 						<thead>
