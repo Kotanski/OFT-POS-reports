@@ -89,3 +89,7 @@ ORDER BY
 # Our Reporting tool with the basic functions
 
 ![PHP reporting for UnicentaPOS](https://github.com/wilwad/php-reporting-for-unicentaopos/blob/main/php-reporting.png?raw=true)
+
+# Now we can create a preview of the receipt and save as a PDF to email to a client ~ 
+
+![PHP reporting for UnicentaPOS](https://github.com/wilwad/php-reporting-for-unicentaopos/blob/main/send-receipt-by-email.png?raw=true)
