@@ -32,6 +32,8 @@
 	  width: 100%;
 	  height:100%; 
 	  background:hsl(0,0%,100%);
+		line-height: 26px;
+		font-weight: 300;	  
 	}
 	.bg-grey {background: grey;}
     .header {font-size: 14pt; color: #FFF; background: #2a5d84; padding: 15px;}
@@ -45,7 +47,9 @@
 	.align-right {text-align: right; }
 	.discount-highlight {color: green;}
 	table.sales thead tr th:nth-child(6){ text-align:right;}
-	table.sales tbody tr td:nth-child(6){ text-align:right;}
+	table.sales tbody tr td:nth-child(6){ text-align:right;}	
+	table.sales thead tr th:nth-child(7){ text-align:right;}
+	table.sales tbody tr td:nth-child(7){ text-align:right;}
 	table.details thead tr th:nth-child(2){ text-align:right;}
 	table.details tbody tr td:nth-child(2){ text-align:right;}
 	table.details thead tr th:nth-child(3){ text-align:center;}
@@ -53,6 +57,23 @@
 	table.details thead tr th:nth-child(4){ text-align:right;}
 	table.details tbody tr td:nth-child(4){ text-align:right;}	
 	table.details {font-size: small;}
+	
+	.outline {
+		margin: 20px;
+	  padding: 10px;
+	}
+	.center {
+	  text-align: center;	  
+   }
+	div.center p {
+	  padding: 0px;
+	  margin: 0px;
+	  font-size: small;
+	}  	
+	 
+	.float-right {
+		float: right;
+	}
   </style>
  </head>
  <body>
@@ -89,14 +110,18 @@
 	// SELECT distinct(ticket) FROM ticketlines WHERE attributes LIKE '%Discount%';
 	
   	// database settings
-    $user = '';
-	$pwd  = '';
+    $user = 'root';
+	$pwd  = 'Admin.2015!';
 	$db   = 'unicentaopos';
 	$host = 'localhost';
+  	        				
+	// connect to MySQL server before doing anything more
+	$conn = @ new mysqli($host, $user,$pwd, $db ) or die($mysqli->error);
+
 	$currency = 'N$';
 	$max = 20; // records to return for default
 	$showsql = false;
-	$hidedetails = false; // by default don't show the products in a transaction   	         
+	$hidedetails = true; // by default don't show the products in a transaction   	         
 	// we list the table columns dynamically, we can filter out the ones we don't need to show
 	$ignored = ['id', 'code', 'codetype'];
 	
@@ -104,14 +129,21 @@
   	$urls = ['Sales'=>'sales', 						// show all sales (minus details)
 			 'Sales Extended'=>'sales-extended', 	// show sales with details
   	         'Discounts'=>'discounts', 				// show all discounts + details when dates set
-  	         'Category Detail'=>'category-detail',	           	         
+  	         'Category Detail'=>'category-detail',	// not implemented yet
   	         'Stock Update'=>'stock-update', 
   	         'Stock in Minus'=>'stock-minus'
   	        ];
-  	        				
-	// connect to MySQL server before doing anything more
-	$conn = @ new mysqli($host, $user,$pwd, $db ) or die($mysqli->error);
 
+	// PDF receipt
+	 $store_line0 = 'Oscar and Olive Clothing Boutique';
+     $store_line1 = "<p>$store_line0</p>";
+     $store_line2 = '<p>Hendrik Witbooi Street</p>';
+     $store_line3 = '<p>Brauhaus Arcade</p>';
+     $store_line4 = '<p>Swakopmund</p>';
+     $store_line5 = '<p>VAT No.: 4181777015<p>'; 
+     $store_line6 = '<p>Terms: Returns Valid for 7 days only.<p>'; 
+     $store_line7 = '<p>Please Call Again.<p>'; 
+     	
 	$view = @ $_GET['view'];	
 	$date_start = @ $_GET['date_start'];
 	$date_end   = @ $_GET['date_end'];
@@ -241,6 +273,7 @@
 							ORDER BY 
 								r.datenew DESC;";	
 			} elseif ($receiptid){
+                $hidedetails = false;
 				$sql = "SELECT 
 								DISTINCT t.ticketid,
 								datenew AS `date`, 
@@ -286,8 +319,8 @@
 									r.datenew ASC;";	
 																					
 			} else {
-				$hidedetails = true;
-				$extras = $view == 'discounts' ? "WHERE	tl.attributes LIKE '%Discount%'" : '';
+				$hidedetails = ($view == 'sales') ? true : false;
+				$extras = ($view == 'discounts') ? "WHERE	tl.attributes LIKE '%Discount%'" : '';
 				$sql = "SELECT 
 								DISTINCT t.ticketid,
 								datenew AS `date`, 
@@ -308,9 +341,12 @@
 								r.datenew DESC LIMIT $max;";
 			}
   	    	break;
-			
+		
+		case 'category-detail':
+			die(alert('This feature is not yet implemented.','danger'));
+			break;
+
   		case 'stock-minus':
-  			 $hidedetails = true;
 			 $sql = "SELECT 
 			 				p.id, 
 			 				c.name AS category, 
@@ -327,8 +363,6 @@
   			break;
 
   		case 'stock-update':
-	   		 $hidedetails = true;  		
-  			 
 			 $sql = "SELECT 
 			 				p.id, 
 			 				c.name AS category, 
@@ -340,14 +374,11 @@
 			 		 	INNER JOIN categories c ON c.id = p.category
 			 		 	INNER JOIN stockcurrent sc ON sc.product = p.id 
 			 		 ORDER BY c.name ASC;";	
-			 break;
-
-  	    				 			                            	
+			 break;  	    				 			                            	
   	}
 	 
 	 // did we get a submit for stock update?
-	 $extra = (int) @ $_POST['extra'];
-	
+	 $extra = (int) @ $_POST['extra'];	
 	 if ($extra){
 		 $id      = $_POST['id'];
 		 $product = $_POST['product'];
@@ -359,7 +390,7 @@
 
 	 //echo alert($sql, 'success');
 	 if ($personid) echo alert("Showing $view transactions only for selected employee &middot; <a href='?view=$view'>Show for All</a>", 'info');
-	 elseif ($receiptid) echo alert("Showing only receipt <b>$receiptid</b> &middot; <a href='?view=$view'>Show All</a>", 'info');
+	 elseif ($receiptid) {}//echo alert("Showing only receipt <b>$receiptid</b> &middot; <a href='?view=$view'>Show All</a>", 'info');
 	 elseif ($date_start && $date_end) echo alert("Showing $view between <b>$date_start $time_start</b> and <b>$date_end $time_end</b> &middot; <a href='?view=$view'>Show All</a>", 'info');
 	 else if (!in_array($view, ['stock-update', 'stock-minus']))	echo alert("Showing last $max <b>$view</b> transactions.", 'info');
 
@@ -396,77 +427,87 @@
 
 		$grandtotal = 0;
 		
+		// receipt PDF
+		$r_receipt = $receiptid;
+		$r_date = '';
+		$r_terminal = 'DESKTOP-ACI7TGA';
+		$r_staff = '';
+		
 		while ( $row = $ret->fetch_array() ){
 			$data .= "<tr>";
 			$data .= "<td>$idx.</td>";
 			$details ='';
 			
-			$receipt = @$row['receipt'];
-			$sql0 = "SELECT line, 
-							(CASE WHEN product IS NULL THEN '_line_discount_' 
-							ELSE (SELECT p.name FROM products p WHERE p.id=tl.product) END) AS product, 	
-							(CASE WHEN product IS NULL THEN '' 
-							ELSE (SELECT c.name FROM products p INNER JOIN categories c WHERE p.id=tl.product AND p.category=c.id) END) AS category,												
-							price,
-							tl.units, 
-							tl.attributes
-					 FROM 
-					 	ticketlines tl 
-					 WHERE tl.ticket='$receipt';";
-					 
-			$ret0 = $conn->query($sql0) or die($mysqli->error);
-			if (!$ret0 || !$ret0->num_rows){
-			} else {
-				while ($row0 = $ret0->fetch_array()){
-						$item=$row0['product'];
-						$attrs=$row0['attributes'];
-						$category = $row0['category'];
-						$categoryf=$category ? "<span class='badge'>$category</span>" : '';
-						$units = 1;
+			if (!$hidedetails){
+				$receipt = @$row['receipt'];
 
-						// if 'Line Discount ?%' or 'Item Discount @ ?%' in attributes
-						if ($item == '_line_discount_' || strpos($attrs,'%') !== false){
-							//if ($showsql) echo "<p class='alert alert-warning'>$sql0</p>";
-							/*
-							<?xml version="1.0" encoding="UTF-8"?>
-							<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">
-							<properties>
-								<comment>uniCenta oPOS</comment>
-								<entry key="product.taxcategoryid">001</entry>      -->[0]
-								<entry key="product.printer">1</entry>              -->[1] 
-								<entry key="product.name">Line Discount 20%</entry> -->[2]
-							</properties>
-							*/
-							$attributes = $row0['attributes'];
-							$xml = simplexml_load_string($attributes);
-							if ($xml === false){
-								$product = 'error';
-							} else {
-
-								$item  = $xml->entry[2];
-								$units = (int) $xml->entry[1];
-								// Find the percentage from Line Discount 5% 
-								$perc = (int)filter_var($item, FILTER_SANITIZE_NUMBER_INT);
-								$item = "<span class='discount-highlight bold'>$item</span>";
-								$price = $perc/100;
-								$value = 0;
-							}							
-						}
+				$sql0 = "SELECT line, 
+								(CASE WHEN product IS NULL THEN '_line_discount_' 
+								ELSE (SELECT p.name FROM products p WHERE p.id=tl.product) END) AS product, 	
+								(CASE WHEN product IS NULL THEN '' 
+								ELSE (SELECT c.name FROM products p INNER JOIN categories c WHERE p.id=tl.product AND p.category=c.id) END) AS category,												
+								price,
+								tl.units, 
+								tl.attributes
+						FROM 
+							ticketlines tl 
+						WHERE tl.ticket='$receipt';";
 						
-						//$units=(int)$row0['units'];
-						$rate=0.15;//(float)$row0['rate'];
-						$price =$row0['price'];
-						$pricetax= $price * $rate;
-						$priceandtax = ($price+$pricetax);
-						$pricef= number_format($priceandtax,2);
-						$value = $priceandtax * $units;
-						$value = number_format($value,2);
-						$details.= "<tr>
-							          <td>$item $categoryf</td>
-							          <td>$currency $pricef</td>
-							          <td>x$units</td>
-							          <td>$currency $value</td>
-							        </tr>";
+				$ret0 = $conn->query($sql0) or die($mysqli->error);
+				if (!$ret0 || !$ret0->num_rows){
+				} else {
+					while ($row0 = $ret0->fetch_array()){
+							$item=$row0['product'];
+							$attrs=$row0['attributes'];
+							$category = $row0['category'];
+							$categoryf=$category ? "<span class='badge'>$category</span>" : '';
+							$units = 1;
+
+							// if 'Line Discount ?%' or 'Item Discount @ ?%' in attributes
+							if ($item == '_line_discount_' || strpos($attrs,'%') !== false){
+								//if ($showsql) echo "<p class='alert alert-warning'>$sql0</p>";
+								/*
+								<?xml version="1.0" encoding="UTF-8"?>
+								<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">
+								<properties>
+									<comment>uniCenta oPOS</comment>
+									<entry key="product.taxcategoryid">001</entry>      -->[0]
+									<entry key="product.printer">1</entry>              -->[1] 
+									<entry key="product.name">Line Discount 20%</entry> -->[2]
+								</properties>
+								*/
+								$attributes = $row0['attributes'];
+								$xml = simplexml_load_string($attributes);
+								if ($xml === false){
+									$product = 'error';
+								} else {
+
+									$item  = $xml->entry[2];
+									$units = (int) $xml->entry[1];
+									// Find the percentage from Line Discount 5% 
+									$perc = (int)filter_var($item, FILTER_SANITIZE_NUMBER_INT);
+									$item = "<span class='discount-highlight bold'>$item</span>";
+									$price = $perc/100;
+									$value = 0;
+								}							
+							}
+							
+							//$units=(int)$row0['units'];
+							$rate=0.15;//(float)$row0['rate'];
+							$price =$row0['price'];
+							$pricetax= $price * $rate;
+							$priceandtax = ($price+$pricetax);
+							$pricef= number_format($priceandtax,2);
+							$value = $priceandtax * $units;
+							$value = number_format($value,2);
+							$categoryf = ($receiptid) ? '' : $categoryf;
+							$details.= "<tr>
+										<td>$item $categoryf</td>
+										<td>$currency $pricef</td>
+										<td>x$units</td>
+										<td>$currency $value</td>
+										</tr>";
+					}
 				}
 			}
 			
@@ -494,6 +535,7 @@
 					case 'date':
 						$val = date_create($val);
 						$val = date_format($val,"d-M-Y H:i:s");
+						$r_date = $val;
 						$data .= "<td>$val</td>";	
 						break;
 						
@@ -542,8 +584,9 @@
 								
 					case 'person':
 						$pid = $row['personid'];
+						$r_staff = $val;
 						$val = "<a href='?view=$view&person=$pid'>$val</td>";
-						$data .= "<td>$val</td>";
+						$data .= "<td>$val</td>";						
 						break;
 								
 					case 'tendered':
@@ -573,18 +616,53 @@
 	     	echo "<h2 class='bold align-right underline'>Total: $currency $grandtotalf</h2>";
 	     }
 	     
-		 echo "<div class='table-responsive'>
-		 		<table class='table table-striped table-hover sales'>
-				   <thead>
-					<tr>
-					 $cols
-					</tr>
-				   </thead>
-				   <tbody>
-					 $data
-			 	   </tbody>
-				</table>
-		       </div>";
+	     if ($receiptid){
+	     	require_once('logo.php');
+	     	$grandtotalf = number_format($grandtotal, 2);
+	     	echo "<script>document.title = '$store_line0 Receipt #$receiptid';</script>";
+	     	echo "<div class='outline'>
+	     	        <div class='center'>
+	     	         <img src='$logo'>
+	     	         <p>&nbsp;</p>
+	     	         $store_line1
+	     	         $store_line2
+	     	         $store_line3
+	     	         $store_line4	  	         
+	     	         </div>
+	     	         <p>&nbsp;</p>
+	     	         <table>
+						<tbody>				
+						 <tr><td>Receipt:</td><td>$receiptid</td></tr>
+						 <tr><td>Date:</td><td>$r_date</td></tr>
+						 <tr><td>Terminal:</td><td>$r_terminal</td></tr>
+						 <tr><td>Served by:</td><td>&nbsp;$r_staff</td></tr>
+						</tbody>
+	     	         </table>
+	     	         <p>&nbsp;</p>
+	     	         $table
+	     	         <h3><strong>Balance Due <span class='float-right'>$currency $grandtotalf</span></strong></h3>
+	     	         <HR>
+	     	         <div class='center'>
+	     	         	$store_line5
+	     	         	$store_line6
+	     	         	$store_line7
+	     	         </div>
+	     		  </div>";
+	     	
+	     } else {
+			 echo "<div class='table-responsive'>
+			 		<table class='table table-striped table-hover sales'>
+					   <thead>
+						<tr>
+						 $cols
+						</tr>
+					   </thead>
+					   <tbody>
+						 $data
+				 	   </tbody>
+					</table>
+				   </div>";
+		 }
 	 }
 	 
 	 function alert($msg, $color='info'){
